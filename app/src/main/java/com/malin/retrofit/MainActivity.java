@@ -3,6 +3,7 @@ package com.malin.retrofit;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.view.View;
+import android.widget.Toast;
 
 import retrofit2.Call;
 import retrofit2.Callback;
@@ -50,11 +51,15 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             @Override
             public void onResponse(Call<JavaBean> call, Response<JavaBean> response) {
 
+                int code = response.code();
+                Toast.makeText(getApplicationContext(), "code:" + code, Toast.LENGTH_SHORT).show();
+
             }
 
             @Override
             public void onFailure(Call<JavaBean> call, Throwable t) {
 
+                t.printStackTrace();
             }
         });
 
