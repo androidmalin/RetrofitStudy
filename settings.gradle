@@ -1,1 +1,4 @@
-include ':app', ':retrofit', ':retrofit-adapters-rxjava2', ':retrofit-converter-gson'
+include ':app'
+include ':retrofit'
+include ':retrofit-adapters-rxjava2'
+include ':retrofit-converter-gson'

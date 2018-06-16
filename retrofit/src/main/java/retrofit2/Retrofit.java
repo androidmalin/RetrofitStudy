@@ -62,17 +62,25 @@ import static retrofit2.Utils.checkNotNull;
 public final class Retrofit {
     private final Map<Method, ServiceMethod<?, ?>> serviceMethodCache = new ConcurrentHashMap<>();
 
+    // 网络请求器的工厂,作用：生产网络请求器(Call),Retrofit是默认使用okHttp
     final okhttp3.Call.Factory callFactory;
+
+    //网络请求的url地址
     final HttpUrl baseUrl;
     final List<Converter.Factory> converterFactories;
+
+    //网络请求适配器工厂的集合;作用：放置网络请求适配器工厂;网络请求适配器工厂作用：生产网络请求适配器(CallAdapter)
     final List<CallAdapter.Factory> callAdapterFactories;
     final @Nullable
     Executor callbackExecutor;
     final boolean validateEagerly;
 
-    Retrofit(okhttp3.Call.Factory callFactory, HttpUrl baseUrl,
-             List<Converter.Factory> converterFactories, List<CallAdapter.Factory> callAdapterFactories,
-             @Nullable Executor callbackExecutor, boolean validateEagerly) {
+    Retrofit(okhttp3.Call.Factory callFactory,
+             HttpUrl baseUrl,
+             List<Converter.Factory> converterFactories,
+             List<CallAdapter.Factory> callAdapterFactories,
+             @Nullable Executor callbackExecutor,
+             boolean validateEagerly) {
         this.callFactory = callFactory;
         this.baseUrl = baseUrl;
         this.converterFactories = converterFactories; // Copy+unmodifiable at call site.
@@ -133,6 +141,9 @@ public final class Retrofit {
         if (validateEagerly) {
             eagerlyValidateMethods(service);
         }
+
+        // 创建了网络请求接口的动态代理对象，即通过动态代理创建网络请求接口的实例 （并最终返回）
+        // 该动态代理是为了拿到网络请求接口实例上所有注解
         return (T) Proxy.newProxyInstance(service.getClassLoader(), new Class<?>[]{service},
                 new InvocationHandler() {
                     private final Platform platform = Platform.get();
@@ -147,8 +158,7 @@ public final class Retrofit {
                         if (platform.isDefaultMethod(method)) {
                             return platform.invokeDefaultMethod(method, service, proxy, args);
                         }
-                        ServiceMethod<Object, Object> serviceMethod =
-                                (ServiceMethod<Object, Object>) loadServiceMethod(method);
+                        ServiceMethod<Object, Object> serviceMethod = (ServiceMethod<Object, Object>) loadServiceMethod(method);
                         OkHttpCall<Object> okHttpCall = new OkHttpCall<>(serviceMethod, args);
                         return serviceMethod.adapt(okHttpCall);
                     }
@@ -164,12 +174,20 @@ public final class Retrofit {
         }
     }
 
+
+    // 一个 ServiceMethod 对象对应于网络请求接口里的一个方法
+    // loadServiceMethod（method）负责加载 ServiceMethod：
     ServiceMethod<?, ?> loadServiceMethod(Method method) {
         ServiceMethod<?, ?> result = serviceMethodCache.get(method);
         if (result != null) return result;
 
+        // 设置线程同步锁
         synchronized (serviceMethodCache) {
             result = serviceMethodCache.get(method);
+
+            // ServiceMethod类对象采用了单例模式进行创建
+            // 即创建ServiceMethod对象前，先看serviceMethodCache有没有缓存之前创建过的网络请求实例
+            // 若没缓存，则通过建造者模式创建 serviceMethod 对象
             if (result == null) {
                 result = new ServiceMethod.Builder<>(this, method).build();
                 serviceMethodCache.put(method, result);
@@ -177,6 +195,12 @@ public final class Retrofit {
         }
         return result;
     }
+
+    // 这里就是上面说的创建实例的缓存机制：采用单例模式从而实现一个 ServiceMethod 对象对应于网络请求接口里的一个方法
+    // 注：由于每次获取接口实例都是传入 class 对象
+    // 而 class 对象在进程内单例的，所以获取到它的同一个方法 Method 实例也是单例的，所以这里的缓存是有效的。
+
+
 
     /**
      * The factory used to create {@linkplain okhttp3.Call OkHttp calls} for sending a HTTP requests.
@@ -223,6 +247,10 @@ public final class Retrofit {
         checkNotNull(annotations, "annotations == null");
 
         int start = callAdapterFactories.indexOf(skipPast) + 1;
+
+        // 创建 CallAdapter 如下
+        // 遍历 CallAdapter.Factory 集合寻找合适的工厂（该工厂集合在第一步构造 Retrofit 对象时进行添加（第一步时已经说明））
+        // 如果最终没有工厂提供需要的 CallAdapter，将抛出异常
         for (int i = start, count = callAdapterFactories.size(); i < count; i++) {
             CallAdapter<?, ?> adapter = callAdapterFactories.get(i).get(returnType, annotations, this);
             if (adapter != null) {
@@ -413,6 +441,7 @@ public final class Retrofit {
             this.platform = platform;
         }
 
+        //步骤1
         public Builder() {
             this(Platform.get());
         }
@@ -460,6 +489,8 @@ public final class Retrofit {
          */
         public Builder baseUrl(String baseUrl) {
             checkNotNull(baseUrl, "baseUrl == null");
+
+            //把String类型的url参数转化为适合OkHttp的HttpUrl类型
             HttpUrl httpUrl = HttpUrl.parse(baseUrl);
             if (httpUrl == null) {
                 throw new IllegalArgumentException("Illegal URL: " + baseUrl);
@@ -519,7 +550,12 @@ public final class Retrofit {
          */
         public Builder baseUrl(HttpUrl baseUrl) {
             checkNotNull(baseUrl, "baseUrl == null");
+
+            //把URL参数分割成几个路径碎片
             List<String> pathSegments = baseUrl.pathSegments();
+
+            // 检测最后一个碎片来检查URL参数是不是以"/"结尾
+            // 不是就抛出异常
             if (!"".equals(pathSegments.get(pathSegments.size() - 1))) {
                 throw new IllegalArgumentException("baseUrl must end in /: " + baseUrl);
             }
@@ -530,6 +566,8 @@ public final class Retrofit {
         /**
          * Add converter factory for serialization and deserialization of objects.
          */
+        // 将上面创建的GsonConverterFactory放入到 converterFactories数组
+        // 在第二步放入一个内置的数据转换器工厂BuiltInConverters(）后又放入了一个GsonConverterFactory
         public Builder addConverterFactory(Converter.Factory factory) {
             converterFactories.add(checkNotNull(factory, "factory == null"));
             return this;
@@ -590,31 +628,65 @@ public final class Retrofit {
                 throw new IllegalStateException("Base URL required.");
             }
 
+            //配置网络请求执行器(callFactory)
             okhttp3.Call.Factory callFactory = this.callFactory;
+
+            // 如果没指定，则默认使用okHttp
+            // 所以Retrofit默认使用okHttp进行网络请求
             if (callFactory == null) {
                 callFactory = new OkHttpClient();
             }
 
+            // 配置回调方法执行器(callbackExecutor)
             Executor callbackExecutor = this.callbackExecutor;
+
+            // 如果没指定，则默认使用Platform检测环境时的默认callbackExecutor
+            // 即Android默认的callbackExecutor
             if (callbackExecutor == null) {
                 callbackExecutor = platform.defaultCallbackExecutor();
             }
 
+            //配置网络请求适配器工厂(CallAdapterFactory)
             // Make a defensive copy of the adapters and add the default Call adapter.
             List<CallAdapter.Factory> callAdapterFactories = new ArrayList<>(this.callAdapterFactories);
-            callAdapterFactories.add(platform.defaultCallAdapterFactory(callbackExecutor));
 
+            // 向该集合中添加了步骤2中创建的CallAdapter.Factory请求适配器(添加在集合器末尾)
+            callAdapterFactories.add(platform.defaultCallAdapterFactory(callbackExecutor));
+            // 请求适配器工厂集合存储顺序：自定义1适配器工厂、自定义2适配器工厂...默认适配器工厂(ExecutorCallAdapterFactory)
+
+
+            //配置数据转换器工厂：converterFactory
+            // 在步骤2中已经添加了内置的数据转换器BuiltInConverters(）（添加到集合器的首位）
+            // 在步骤4中又插入了一个Gson的转换器 - GsonConverterFactory（添加到集合器的首二位）
             // Make a defensive copy of the converters.
-            List<Converter.Factory> converterFactories =
-                    new ArrayList<>(1 + this.converterFactories.size());
+            List<Converter.Factory> converterFactories = new ArrayList<>(1 + this.converterFactories.size());
 
             // Add the built-in converter factory first. This prevents overriding its behavior but also
             // ensures correct behavior when using converters that consume all types.
+
+            // BuiltInConverters是一个内置的数据转换器工厂（继承Converter.Factory类）
+            //new BuiltInConverters()是为了初始化数据转换器
             converterFactories.add(new BuiltInConverters());
+
+            //数据转换器工厂集合存储的是：默认数据转换器工厂(BuiltInConverters)、自定义1数据转换器工厂(GsonConverterFactory)、自定义2数据转换器工厂....
+
+            // converterFactories是一个存放数据转换器Converter.Factory的数组
+            // 配置converterFactories即配置里面的数据转换器
             converterFactories.addAll(this.converterFactories);
 
-            return new Retrofit(callFactory, baseUrl, unmodifiableList(converterFactories),
-                    unmodifiableList(callAdapterFactories), callbackExecutor, validateEagerly);
+
+            // 获取合适的网络请求适配器和数据转换器都是从adapterFactories和converterFactories集合的首位-末位开始遍历
+            // 因此集合中的工厂位置越靠前就拥有越高的使用权限
+
+
+            // 最终返回一个Retrofit的对象，并传入上述已经配置好的成员变量
+            return new Retrofit(
+                    callFactory,
+                    baseUrl,
+                    unmodifiableList(converterFactories),
+                    unmodifiableList(callAdapterFactories),
+                    callbackExecutor,
+                    validateEagerly);
         }
     }
 }

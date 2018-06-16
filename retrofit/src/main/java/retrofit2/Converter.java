@@ -54,8 +54,7 @@ public interface Converter<F, T> {
          * declaration.
          */
         public @Nullable
-        Converter<ResponseBody, ?> responseBodyConverter(Type type,
-                                                         Annotation[] annotations, Retrofit retrofit) {
+        Converter<ResponseBody, ?> responseBodyConverter(Type type, Annotation[] annotations, Retrofit retrofit) {
             return null;
         }
 
@@ -66,8 +65,7 @@ public interface Converter<F, T> {
          * values.
          */
         public @Nullable
-        Converter<?, RequestBody> requestBodyConverter(Type type,
-                                                       Annotation[] parameterAnnotations, Annotation[] methodAnnotations, Retrofit retrofit) {
+        Converter<?, RequestBody> requestBodyConverter(Type type, Annotation[] parameterAnnotations, Annotation[] methodAnnotations, Retrofit retrofit) {
             return null;
         }
 
@@ -79,8 +77,7 @@ public interface Converter<F, T> {
          * {@link Query @Query}, and {@link QueryMap @QueryMap} values.
          */
         public @Nullable
-        Converter<?, String> stringConverter(Type type, Annotation[] annotations,
-                                             Retrofit retrofit) {
+        Converter<?, String> stringConverter(Type type, Annotation[] annotations, Retrofit retrofit) {
             return null;
         }
 

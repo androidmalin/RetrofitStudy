@@ -40,22 +40,26 @@ public final class GsonConverterFactory extends Converter.Factory {
      * Create an instance using a default {@link Gson} instance for conversion. Encoding to JSON and
      * decoding from JSON (when no charset is specified by a header) will use UTF-8.
      */
+
+    //步骤1
     public static GsonConverterFactory create() {
-        return create(new Gson());
+        return create(new Gson());//-->步骤2
     }
 
     /**
      * Create an instance using {@code gson} for conversion. Encoding to JSON and
      * decoding from JSON (when no charset is specified by a header) will use UTF-8.
      */
+    //步骤2
     @SuppressWarnings("ConstantConditions") // Guarding public API nullability.
     public static GsonConverterFactory create(Gson gson) {
         if (gson == null) throw new NullPointerException("gson == null");
-        return new GsonConverterFactory(gson);
+        return new GsonConverterFactory(gson);//-->步骤3
     }
 
     private final Gson gson;
 
+    //步骤3
     private GsonConverterFactory(Gson gson) {
         this.gson = gson;
     }

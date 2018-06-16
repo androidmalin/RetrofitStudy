@@ -67,19 +67,29 @@ final class ServiceMethod<R, T> {
     static final Pattern PARAM_URL_REGEX = Pattern.compile("\\{(" + PARAM + ")\\}");
     static final Pattern PARAM_NAME_REGEX = Pattern.compile(PARAM);
 
-    private final okhttp3.Call.Factory callFactory;
+    private final okhttp3.Call.Factory callFactory; // 网络请求工厂
     private final CallAdapter<R, T> callAdapter;
+    // 网络请求适配器工厂
+    // 具体创建是在new ServiceMethod.Builder(this, method).build()最后的build()中
 
-    private final HttpUrl baseUrl;
     private final Converter<ResponseBody, R> responseConverter;
-    private final String httpMethod;
-    private final String relativeUrl;
-    private final Headers headers;
-    private final MediaType contentType;
+    // Response内容转换器
+    // 作用：负责把服务器返回的数据（JSON或者其他格式，由 ResponseBody 封装）转化为 R 类型的对象；
+
+    private final HttpUrl baseUrl; // 网络请求地址
+    private final String relativeUrl; // 网络请求的相对地址
+    private final String httpMethod;   // 网络请求的Http方法
+    private final Headers headers;  // 网络请求的http请求头 键值对
+    private final MediaType contentType; // 网络请求的http报文body的类型
+
     private final boolean hasBody;
     private final boolean isFormEncoded;
     private final boolean isMultipart;
     private final ParameterHandler<?>[] parameterHandlers;
+    // 方法参数处理器
+    // 作用：负责解析 API 定义时每个方法的参数，并在构造 HTTP 请求时设置参数；
+    // 下面会详细说明
+    // 说明：从上面的成员变量可以看出，ServiceMethod对象包含了访问网络的所有基本信息
 
     ServiceMethod(Builder<R, T> builder) {
         this.callFactory = builder.retrofit.callFactory();
@@ -164,21 +174,44 @@ final class ServiceMethod<R, T> {
         Builder(Retrofit retrofit, Method method) {
             this.retrofit = retrofit;
             this.method = method;
+
+            // 获取网络请求接口方法里的注释
             this.methodAnnotations = method.getAnnotations();
+
+            // 获取网络请求接口方法里的参数类型
             this.parameterTypes = method.getGenericParameterTypes();
+
+            //获取网络请求接口方法里的注解内容
             this.parameterAnnotationsArray = method.getParameterAnnotations();
         }
 
         public ServiceMethod build() {
+
+            //根据网络请求接口方法的返回值和注解类型，从Retrofit对象中获取对应的网络请求适配器  -->关注点1
             callAdapter = createCallAdapter();
+
+            //根据网络请求接口方法的返回值和注解类型，从Retrofit对象中获取该网络适配器返回的数据类型
             responseType = callAdapter.responseType();
+
             if (responseType == Response.class || responseType == okhttp3.Response.class) {
                 throw methodError("'"
                         + Utils.getRawType(responseType).getName()
                         + "' is not a valid response body type. Did you mean ResponseBody?");
             }
+
+            // 根据网络请求接口方法的返回值和注解类型，从Retrofit对象中获取对应的数据转换器  -->关注点3
+            // 构造 HTTP 请求时，我们传递的参数都是String
+            // Retrofit 类提供 converter把传递的参数都转化为 String
+            // 其余类型的参数都利用 Converter.Factory 的stringConverter 进行转换
+            // @Body 和 @Part 类型的参数利用Converter.Factory 提供的 requestBodyConverter 进行转换
+            // 这三种 converter 都是通过“询问”工厂列表进行提供，而工厂列表我们可以在构造 Retrofit 对象时进行添加。
             responseConverter = createResponseConverter();
 
+
+            // 解析网络请求接口中方法的注解
+            // 主要是解析获取Http请求的方法
+            // 注解包括：DELETE、GET、POST、HEAD、PATCH、PUT、OPTIONS、HTTP、retrofit2.http.Headers、Multipart、FormUrlEncoded
+            // 处理主要是调用方法 parseHttpMethodAndPath(String httpMethod, String value, boolean hasBody) ServiceMethod中的httpMethod、hasBody、relativeUrl、relativeUrlParamNames域进行赋值
             for (Annotation annotation : methodAnnotations) {
                 parseMethodAnnotation(annotation);
             }
@@ -198,6 +231,7 @@ final class ServiceMethod<R, T> {
                 }
             }
 
+            // 获取当前方法的参数数量
             int parameterCount = parameterAnnotationsArray.length;
             parameterHandlers = new ParameterHandler<?>[parameterCount];
             for (int p = 0; p < parameterCount; p++) {
@@ -207,6 +241,10 @@ final class ServiceMethod<R, T> {
                             parameterType);
                 }
 
+
+                // 为方法中的每个参数创建一个ParameterHandler<?>对象并解析每个参数使用的注解类型
+                // 该对象的创建过程就是对方法参数中注解进行解析
+                // 这里的注解包括：Body、PartMap、Part、FieldMap、Field、Header、QueryMap、Query、Path、Url
                 Annotation[] parameterAnnotations = parameterAnnotationsArray[p];
                 if (parameterAnnotations == null) {
                     throw parameterError(p, "No Retrofit annotation found.");
@@ -229,9 +267,19 @@ final class ServiceMethod<R, T> {
             }
 
             return new ServiceMethod<>(this);
+
+            // 总结
+            // 1. 根据返回值类型和方法标注从Retrofit对象的的网络请求适配器工厂集合和内容转换器工厂集合中分别获取到该方法对应的网络请求适配器和Response内容转换器；
+            // 2. 根据方法的标注对ServiceMethod的域进行赋值
+            // 3. 最后为每个方法的参数的标注进行解析，获得一个ParameterHandler<?>对象
+            // 该对象保存有一个Request内容转换器——根据参数的类型从Retrofit的内容转换器工厂集合中获取一个Request内容转换器或者一个String内容转换器。
+
         }
 
+        //关注点1：createCallAdapter()
         private CallAdapter<T, R> createCallAdapter() {
+
+            // 获取网络请求接口里方法的返回值类型
             Type returnType = method.getGenericReturnType();
             if (Utils.hasUnresolvableType(returnType)) {
                 throw methodError(
@@ -240,8 +288,14 @@ final class ServiceMethod<R, T> {
             if (returnType == void.class) {
                 throw methodError("Service methods cannot return void.");
             }
+
+            // 获取网络请求接口接口里的注解,例如:@Get
             Annotation[] annotations = method.getAnnotations();
             try {
+
+                // 根据网络请求接口方法的返回值和注解类型，从Retrofit对象中获取对应的网络请求适配器
+                // 下面会详细说明retrofit.callAdapter（） -- >关注点2
+
                 //noinspection unchecked
                 return (CallAdapter<T, R>) retrofit.callAdapter(returnType, annotations);
             } catch (RuntimeException e) { // Wide exception range because factories are user code.
