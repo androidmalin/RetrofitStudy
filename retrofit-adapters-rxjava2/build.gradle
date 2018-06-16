@@ -1,0 +1,24 @@
+apply plugin: 'com.android.library'
+
+android {
+    compileSdkVersion rootProject.ext.android.compileSdkVersion
+    buildToolsVersion rootProject.ext.android.buildToolsVersion
+
+    defaultConfig {
+        resConfigs "zh", "en"
+        minSdkVersion rootProject.ext.android.minSdkVersion
+        targetSdkVersion rootProject.ext.android.targetSdkVersion
+        versionName "2.4.0"
+    }
+
+}
+
+dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation rootProject.ext.dependencies["findbugs"]
+    implementation rootProject.ext.dependencies["rxjava2"]
+    implementation(rootProject.ext.dependencies["rxandroid2"]) {
+        exclude group: 'io.reactivex.rxjava2', module: 'rxjava'
+    }
+    implementation project(':retrofit')
+}

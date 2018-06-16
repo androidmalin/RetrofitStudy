@@ -1,0 +1,26 @@
+ext {
+    android = [
+            applicationId    : "com.malin.retrofit",
+            compileSdkVersion: 27,
+            buildToolsVersion: "28.0.0",
+            minSdkVersion    : 15,
+            targetSdkVersion : 19,
+            versionCode      : 1,
+            versionName      : "1.0",
+    ]
+
+    dependencies = [
+            'rxjava2'                   : 'io.reactivex.rxjava2:rxjava:2.1.14',
+            'rxandroid2'                : 'io.reactivex.rxjava2:rxandroid:2.0.2',
+            'converter-gson'            : 'com.squareup.retrofit2:converter-gson:2.4.0',
+            'adapter-rxjava2'           : 'com.squareup.retrofit2:adapter-rxjava2:2.4.0',
+            'retrofit'                  : 'com.squareup.retrofit2:retrofit:2.4.0',
+            'gson'                      : 'com.google.code.gson:gson:2.8.5',
+            'okhttp'                    : 'com.squareup.okhttp3:okhttp:3.10.0',
+            'debug-db'                  : 'com.amitshekhar.android:debug-db:1.0.3',
+            'findbugs'                  : 'com.google.code.findbugs:jsr305:3.0.2',
+            'animal-sniffer-annotations': 'org.codehaus.mojo:animal-sniffer-annotations:1.16'
+
+    ]
+
+}
